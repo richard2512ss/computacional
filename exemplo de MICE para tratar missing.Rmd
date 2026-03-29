@@ -1,0 +1,266 @@
+---
+title: "Lista 1 - Estatística Computacional II"
+author: "João Vitor Lucena e RIchard Salustriano da Silva"
+date: "2026-03-25"
+output:
+pdf_document: default
+word_document: default
+---
+
+```{r setup, include=FALSE}
+# Configurações gerais do documento
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r bibliotecas}
+# Carregando as bibliotecas necessárias
+library(tidyverse)
+library(mice)
+library(naniar)
+library(GGally)
+library(caret)
+```
+
+---
+
+## 1. Dados e Valores Faltantes
+
+Nesta seção, carregamos o dataset `mtcars` e inserimos valores faltantes de forma aleatória nas variáveis `hp`, `wt` e `disp` para simular uma situação real de dados incompletos.
+
+```{r dados}
+data(mtcars)
+carros <- mtcars
+
+# Inserindo NAs aleatórios para simular dados faltantes
+set.seed(123)
+carros$hp[sample(1:nrow(carros), 5)]   <- NA
+carros$wt[sample(1:nrow(carros), 4)]   <- NA
+carros$disp[sample(1:nrow(carros), 3)] <- NA
+```
+
+```{r missing}
+# Quantidade de NAs por variável
+colSums(is.na(carros))
+
+# Proporção de NAs por variável (em %)
+prop_miss <- colMeans(is.na(carros)) * 100
+prop_miss
+
+# Verificando se alguma variável tem mais de 25% de missing
+prop_miss[prop_miss > 25]
+```
+
+Nenhuma variável possui mais de 25% de valores faltantes, então podemos prosseguir com a imputação.
+
+---
+
+## 2. Imputação com MICE
+
+Utilizamos o método PMM (Predictive Mean Matching) com 5 conjuntos imputados.
+
+```{r imputacao}
+# Aplicando o método MICE para imputação
+imputacao <- mice(carros, m = 5, method = "pmm", seed = 123)
+carros_imp <- complete(imputacao)
+```
+
+### Verificando a estabilidade das imputações
+
+```{r convergencia}
+# O gráfico abaixo mostra se as imputações convergem ao longo das iterações
+plot(imputacao)
+```
+
+### Comparação antes e depois da imputação
+
+A seguir comparamos os histogramas, médias e variâncias das variáveis imputadas.
+
+```{r histogramas_wt}
+par(mfrow = c(1, 2))
+hist(carros$wt,     main = "wt - Antes")
+hist(carros_imp$wt, main = "wt - Depois")
+```
+
+```{r stats_wt}
+# Média e variância de wt
+cat("Média antes:", mean(carros$wt, na.rm = TRUE), "\n")
+cat("Média depois:", mean(carros_imp$wt), "\n")
+cat("Variância antes:", var(carros$wt, na.rm = TRUE), "\n")
+cat("Variância depois:", var(carros_imp$wt), "\n")
+```
+
+```{r histogramas_hp}
+par(mfrow = c(1, 2))
+hist(carros$hp,     main = "hp - Antes")
+hist(carros_imp$hp, main = "hp - Depois")
+```
+
+```{r stats_hp}
+# Média e variância de hp
+cat("Média antes:", mean(carros$hp, na.rm = TRUE), "\n")
+cat("Média depois:", mean(carros_imp$hp), "\n")
+cat("Variância antes:", var(carros$hp, na.rm = TRUE), "\n")
+cat("Variância depois:", var(carros_imp$hp), "\n")
+```
+
+```{r histogramas_disp}
+par(mfrow = c(1, 2))
+hist(carros$disp,     main = "disp - Antes")
+hist(carros_imp$disp, main = "disp - Depois")
+```
+
+```{r stats_disp}
+# Média e variância de disp
+cat("Média antes:", mean(carros$disp, na.rm = TRUE), "\n")
+cat("Média depois:", mean(carros_imp$disp), "\n")
+cat("Variância antes:", var(carros$disp, na.rm = TRUE), "\n")
+cat("Variância depois:", var(carros_imp$disp), "\n")
+```
+
+A imputação alterou levemente a distribuição das variáveis, mas sem mudanças drásticas — o que é esperado com poucos dados faltantes.
+
+---
+
+## 3. Detecção e Tratamento de Outliers
+
+### Boxplots das variáveis
+
+```{r boxplots}
+par(mfrow = c(3, 4))
+for (var in names(carros_imp)[1:11]) {
+  boxplot(carros_imp[[var]], main = paste("Boxplot de", var))
+}
+```
+
+### Identificando outliers pelo critério IQR
+
+```{r detecta_outliers}
+# Função para detectar outliers usando a regra do IQR
+detect_outliers <- function(x) {
+  q1  <- quantile(x, 0.25)
+  q3  <- quantile(x, 0.75)
+  iqr <- q3 - q1
+  which(x < q1 - 1.5 * iqr | x > q3 + 1.5 * iqr)
+}
+
+lapply(carros_imp[, 1:11], detect_outliers)
+```
+
+Foram encontrados outliers nas variáveis `carb`, `wt`, `qsec` e `mpg`.
+
+### Winsorização
+
+Substituímos os outliers pelos limites inferior e superior do IQR.
+
+```{r winsor}
+# Função de winsorização
+winsor <- function(x) {
+  q1    <- quantile(x, 0.25)
+  q3    <- quantile(x, 0.75)
+  iqr   <- q3 - q1
+  lower <- q1 - 1.5 * iqr
+  upper <- q3 + 1.5 * iqr
+  x[x < lower] <- lower
+  x[x > upper] <- upper
+  x
+}
+
+carros_limpos <- carros_imp
+carros_limpos[, 1:11] <- lapply(carros_limpos[, 1:11], winsor)
+```
+
+---
+
+## 4. Padronização e Correlação
+
+```{r padronizacao}
+# Padronizando os dados (média 0, desvio padrão 1)
+carros_scaled <- carros_limpos
+carros_scaled[, 1:11] <- scale(carros_scaled[, 1:11])
+
+summary(carros_scaled)
+```
+
+```{r correlacao}
+# Matriz de correlação entre as variáveis
+GGally::ggpairs(carros_scaled[, 1:11])
+```
+
+---
+
+## 5. Modelagem: Regressão Linear
+
+### Modelo com dados sem padronização
+
+```{r modelo_sem_pad}
+# Modelo com todas as variáveis preditoras (dados originais limpos)
+modelo <- lm(mpg ~ cyl + disp + hp + drat + wt + qsec + vs + am + gear + carb,
+             data = carros_limpos)
+summary(modelo)
+```
+
+### Modelo com dados padronizados
+
+```{r modelo_pad}
+# Mesmo modelo com dados padronizados
+modelo_pad <- lm(mpg ~ cyl + disp + hp + drat + wt + qsec + vs + am + gear + carb,
+                 data = carros_scaled)
+summary(modelo_pad)
+```
+
+A padronização muda a interpretação dos coeficientes (que passam a representar o efeito por desvio padrão), mas não altera a significância das variáveis nem a qualidade do ajuste.
+
+---
+
+## 6. Seleção de Variáveis: Stepwise por AIC
+
+### Com dados sem padronização
+
+```{r stepwise}
+# Modelos nulo e completo
+min.model  <- lm(mpg ~ 1,  data = carros_imp)
+full.model <- lm(mpg ~ .,  data = carros_imp)
+
+# Seleção stepwise (bidirecional) baseada no AIC
+step.model <- step(min.model,
+                   scope = list(lower = min.model, upper = full.model),
+                   direction = "both",
+                   trace = TRUE)
+
+summary(step.model)
+```
+
+### Com dados padronizados
+
+```{r stepwise_pad}
+min.model1  <- lm(mpg ~ 1,  data = carros_scaled)
+full.model1 <- lm(mpg ~ .,  data = carros_scaled)
+
+step.model1 <- step(min.model1,
+                    scope = list(lower = min.model1, upper = full.model1),
+                    direction = "both",
+                    trace = TRUE)
+
+summary(step.model1)
+```
+
+Após a seleção stepwise, o modelo resultante apresenta variáveis com coeficientes significativos. Com os dados padronizados, apenas uma variável não se mostrou significativa.
+
+---
+
+## 7. Respostas às Perguntas
+
+**Alguma variável possui mais de 25% de valores faltantes?**  
+Não. A proporção máxima encontrada foi inferior a 25% em todas as variáveis.
+
+**A imputação alterou a distribuição das variáveis?**  
+Sim, levemente. Houve pequenas variações nas médias e variâncias das variáveis `hp`, `wt` e `disp`, mas sem mudanças expressivas na forma da distribuição.
+
+**Existem outliers extremos?**  
+Sim. Foram identificados outliers nas variáveis `carb`, `wt`, `qsec` e `mpg`.
+
+**A padronização mudou a interpretação dos coeficientes?**  
+Sim. Após a padronização, cada coeficiente representa o efeito de um aumento de um desvio padrão na variável preditora sobre `mpg`. No modelo sem padronização, os coeficientes estão nas unidades originais de cada variável. A significância das variáveis e o ajuste do modelo, no entanto, permanecem iguais.
+
+**Quais variáveis são significativas no modelo?**  
+No modelo completo (sem stepwise), nenhuma variável foi individualmente significativa — o que é esperado em presença de multicolinearidade. Após a seleção stepwise com dados padronizados, o modelo resultante apresentou variáveis significativas, com exceção de uma.
