@@ -1,0 +1,696 @@
+---
+title: "Trabalho 1"
+author: "Richard Salustriano da Silva"
+date: "2026-05-17"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+# Questão 1 – Métodos Iterativos para Solução de Equações
+## a) Mostre graficamente que a equação possui uma raiz real
+```{r}
+# Definindo a função
+f <- function(x){
+  x^3 - x - 2
+}
+```
+
+```{r}
+# Criando o gráfico
+curve(f, from = -5, to = 5, 
+      ylim = c(-5, 5),      # Define o intervalo do eixo y
+      col = "blue", lwd = 2, 
+      main = "Gráfico de f(x)",
+      xlab = "x", ylab = "f(x)")
+abline(h = 0, col = "red", lty = 2)
+
+# Adicionando uma grade para facilitar a visualização
+grid()
+
+```
+
+Analisando o gráfico vemos que a raíz da função está entre 0 e 2
+
+
+## b) Utilize o método da bisseção no intervalo [1,2] até erro menor que 10^-5
+```{r}
+# com a função f já definida, definimos as configurações iniciais para fazer o método da bisseção
+a <- 1
+b <- 2
+tol <- 1e-5
+iter_bis <- 0
+
+#Início da medição de tempo
+tempo_inicial_bis <- Sys.time()
+
+# Execução do algoritmo
+while ((b - a) / 2 > tol) {
+  iter_bis <- iter_bis + 1
+  m <- (a + b) / 2
+  if (f(a) * f(m) < 0) {
+    b <- m
+  } else {
+    a <- m
+  }
+}
+
+# Fim da medição
+tempo_final_bis <- Sys.time()
+tempo_total_bis <- tempo_final_bis - tempo_inicial_bis
+
+raiz_final <- (a + b) / 2
+```
+
+Resultados
+
+```{r,echo=FALSE}
+cat("Raiz estimada:", raiz_final, "\n")
+cat("Número de iterações:", iter_bis, "\n")
+cat("Tempo computacional:", tempo_total_bis, "segundos\n")
+```
+## c) Utilize o método de Newton-Raphson com chute inicial x0=1,5.
+
+```{r}
+# Como a função já definida, Definimos a sua derivada
+df <- function(x){
+  3*x^2 - 1
+}
+#Parâmetros iniciais
+x_n <- 1.5
+tol <- 1e-5
+erro <- 1
+iter_newton <- 0
+
+#Medição de tempo inicial
+tempo_ini_newton <- Sys.time()
+
+# Loop de Newton-Raphson
+while (erro > tol) {
+  iter_newton <- iter_newton + 1
+  x_novo <- x_n - f(x_n)/df(x_n)
+  
+  erro <- abs(x_novo - x_n)
+  x_n <- x_novo
+}
+
+# Medição de tempo final
+tempo_fim_newton <- Sys.time()
+tempo_total_newton <- tempo_fim_newton - tempo_ini_newton
+
+```
+Resultados
+```{r,echo=FALSE}
+cat("Raiz estimada (Newton):", x_n, "\n")
+cat("Número de iterações:", iter_newton, "\n")
+cat("Tempo computacional:", tempo_total_newton, "segundos\n")
+
+```
+O método de Newton convergiu em 3 iterações
+
+## d) Compare número de iterações e tempo computacional.
+```{r,echo=FALSE}
+cat("========================================\n")
+cat("   Comparação dos Métodos Iterativos\n")
+cat("========================================\n\n")
+
+cat("Método de Newton-Raphson\n")
+cat("------------------------\n")
+cat("Número de iterações :", iter_newton, "\n")
+cat("Tempo computacional :", tempo_total_newton, "segundos\n\n")
+
+cat("Método da Bisseção\n")
+cat("------------------\n")
+cat("Número de iterações :", iter_bis, "\n")
+cat("Tempo computacional :", tempo_total_bis, "segundos\n")
+
+cat("\n========================================\n")
+```
+Os tempos computacionais foram parecidos(práticamente instantâneos), porém o método de Newton convergiu muito mais rapidamente
+
+# Questão 2 - Sistema Não Linear
+## a) Use um dos métodos iterativos aprendidos
+
+Para resolver o sistema não linear, utilizaremos o Método da bisseção
+
+Para aplicar o Método da Bisseção (que é um método para equações unidimensionais) neste sistema, realizamos uma substituição algébrica prévia. O sistema original é dado por:
+
+ $x^2 + y^2 = 4$
+ $e^x + y = 1$
+
+Isolando $y$ na segunda equação, obtemos $y = 1 - e^x$. Substituindo este resultado na primeira equação, reduzimos o problema a encontrar a raiz da seguinte função univariada:
+
+$$g(x) = x^2 + (1 - e^x)^2 - 4 = 0$$
+```{r}
+# Definindo a função do sistema reduzido
+g <- function(x){
+  x^2 + (1 - exp(x))^2 - 4
+} 
+
+# Escolhendo a tolerancia
+tol <- 1e-5
+
+# Algoritmo da Bisseção
+bissec <- function(a, b, tol) {
+
+  while ((b - a)/2 > tol) {
+
+    m <- (a + b)/2
+
+    if (g(a) * g(m) < 0) {
+      b <- m
+    } else {
+      a <- m
+    }
+  }
+
+  # Solução aproximada
+  x_sol <- (a + b)/2
+  y_sol <- 1 - exp(x_sol)
+
+  # Retorno
+  return(list(
+    x = x_sol,
+    y = y_sol
+  ))
+}
+bissec(1,2,tol)
+```
+
+## b) Apresente gráfico das curvas e solução
+
+```{r}
+# Sequência de valores de x
+x <- seq(-3,3, length = 1000)
+
+# Curva exponencial
+y_exp <- 1 - exp(x)
+
+# Parte superior e inferior da circunferência
+y_circ_sup <- sqrt(4 - x^2)
+y_circ_inf <- -sqrt(4 - x^2)
+
+# Gráfico
+plot(x, y_exp,
+     type = "l",
+     col = "blue",
+     lwd = 2,
+     ylim = c(-8, 8),
+     xlab = "x",
+     ylab = "y",
+     main = "Interseção das Curvas")
+
+# Circunferência
+lines(x, y_circ_sup, col = "red", lwd = 2)
+lines(x, y_circ_inf, col = "red", lwd = 2)
+```
+
+
+## c) Verifique sensibilidade aos valores iniciais
+```{r}
+# testando a função de bisseção com diferentes valores iniciais
+bissec(1,0,tol)
+bissec(0,-1,tol)
+bissec(-1,1,tol)
+bissec(2,-2,tol)
+bissec(5,5,tol)
+
+```
+O método da bisseção requer que a função apresente mudança de sinal no intervalo considerado, isto é,
+
+$f(a)⋅f(b)<0$
+
+Essa condição garante, pelo Teorema do Valor Intermediário, a existência de pelo menos uma raiz no intervalo [a,b], desde que a função seja contínua.
+
+Por isso os pontos testados não convergiram para o valor desejado
+
+# Questão 3 - Computação com Matrizes
+## a) Calcule determinante, traço e inversa
+```{r}
+#  Definindo a matriz A
+A <- matrix(c(4, 1, 2,
+              1, 3, 0,
+              2, 0, 5), nrow = 3, byrow = TRUE)
+
+# Calculando o Determinante
+det_A <- det(A)
+
+# Calculando o Traço
+# O traço é a soma dos elementos da diagonal principal
+traco_A <- sum(diag(A))
+
+# Calculando a Inversa
+inversa_A <- solve(A)
+```
+
+--- Exibindo os Resultados ---
+
+```{r,echo=FALSE}
+cat("--- RESULTADOS ---\n\n")
+cat("Matriz A:\n")
+print(A)
+cat("\nDeterminante de A:\n")
+print(det_A)
+cat("\nTraço de A:\n")
+print(traco_A)
+cat("\nInversa de A:\n")
+print(inversa_A)
+```
+
+## b) Obtenha autovalores e autovetores
+
+```{r}
+# Definindo a matriz A (caso não esteja na memória)
+A <- matrix(c(4, 1, 2,
+              1, 3, 0,
+              2, 0, 5), nrow = 3, byrow = TRUE)
+
+# Obtendo autovalores e autovetores
+resultado_eigen <- eigen(A)
+```
+
+ --- Exibindo os Resultados ---
+```{r,echo=FALSE}
+cat("--- RESULTADOS ---\n\n")
+cat("Autovalores (λ):\n")
+print(resultado_eigen$values)
+
+cat("\nAutovetores (Matriz onde cada coluna é um autovetor):\n")
+print(resultado_eigen$vectors)
+```
+
+## c) Verifique se A é definida positiva 
+
+Como os autovalores são todos positivos , então a matriz é positiva definida
+
+## d) Faça a decomposição LU
+
+```{r}
+library(Matrix)
+
+# Definindo a matriz A
+A <- matrix(c(4, 1, 2,
+              1, 3, 0,
+              2, 0, 5), nrow = 3, byrow = TRUE)
+
+#Executando a decomposição LU
+fatoracao <- lu(A)
+
+# Extraindo as matrizes L e U do objeto gerado
+# O comando expand(fatoracao) retorna P, L e U (onde P é a matriz de permutação)
+componentes <- expand(fatoracao)
+
+L <- componentes$L
+U <- componentes$U
+```
+
+--- Exibindo os Resultados ---
+```{r,echo=FALSE}
+cat("--- RESULTADOS ---\n\n")
+cat("Matriz L (Triangular Inferior):\n")
+print(L)
+
+cat("\nMatriz U (Triangular Superior):\n")
+print(U)
+
+# --- Verificação Matemática ---
+cat("\nVerificação (L %*% U):\n")
+print(L %*% U)
+```
+
+# Questão 4 - Regressão Linear via Álgebra Matricial
+
+## a) Calcule beta
+```{r}
+# Definindo os dados conforme o enunciado
+y <- matrix(c(2, 3, 5, 6), ncol = 1)
+X <- matrix(c(1, 1, 1, 1,  # Coluna do Intercepto
+              1, 2, 3, 4), # Coluna da variável independente
+            ncol = 2, byrow = FALSE)
+
+# Calculando beta via álgebra matricial
+# t(X) é a transposta, solve() calcula a inversa, %*% é multiplicação matricial
+XtX_inv <- solve(t(X) %*% X)
+Xty <- t(X) %*% y
+beta <- XtX_inv %*% Xty
+```
+
+--- Exibindo os Resultados ---
+
+```{r,echo=FALSE}
+cat("Matriz X:\n")
+print(X)
+cat("\nVetor y:\n")
+print(y)
+cat("\nCoeficientes Beta (Calculados):\n")
+print(beta)
+```
+
+## b) Obtenha os valores ajustados de y e os resíduos
+
+```{r}
+# Calculando os valores ajustados (y_chapéu)
+# y_hat = X %*% beta
+y_hat <- X %*% beta
+
+# Calculando os resíduos (e)
+# erro = y_observado - y_ajustado
+residuos <- y - y_hat
+```
+
+--- Exibindo os Resultados ---
+
+```{r,echo=FALSE}
+cat("Valores Ajustados (y_hat):\n")
+print(y_hat)
+
+cat("\nResíduos (e):\n")
+print(residuos)
+```
+
+## c) Compare com a função pronta (lm) do softwere
+
+```{r}
+# Definindo os dados (vetores simples para a função lm)
+y_vetor <- c(2, 3, 5, 6)
+x_vetor <- c(1, 2, 3, 4)
+
+# Ajustando o modelo de regressão linear via função pronta
+modelo_lm <- lm(y_vetor ~ x_vetor)
+
+# Extraindo os coeficientes e resíduos para comparação
+beta_lm <- coef(modelo_lm)
+ajustados_lm <- fitted(modelo_lm)
+residuos_lm <- residuals(modelo_lm)
+```
+
+--- Exibindo a Comparação ---
+```{r,echo=FALSE}
+cat("--- COMPARAÇÃO DE RESULTADOS ---\n\n")
+
+cat("Os valores ajustados do modelo feito pela forma matricial são:\n")
+print(y_hat)
+cat("\nValores Ajustados feitos pela função lm são :\n")
+print(ajustados_lm)
+
+cat("os resíduos feitos pelo forma matricial são:\n")
+print(residuos)
+cat("\nResíduos feitos pela função lm são:\n")
+print(residuos_lm)
+```
+
+
+Os coeficientes estimados, valores ajustados e resíduos obtidos pela forma matricial coincidem com os resultados produzidos pela função lm() do R. Isso confirma a implementação correta da regressão linear utilizando álgebra matricial.
+
+# Questão 5 – Otimização sem Restrições
+
+Considere $f(x,y)=x⁴+y⁴−4xy+x+1$
+
+Derivando f(x,y) por x temos -> $4x^3 -4y+1$
+
+Derivando f(x,y) por y temos -> $4y^3 -4x$
+
+
+```{r}
+
+f5<- function(f){
+  x<-f[1]
+  y<-f[2]
+  x^4 +y^4 -4*x*y+x+1
+}
+
+
+formula<- function(f){
+  x<-f[1]
+  y<-f[2]
+  
+  funcaoderivada_X<- 4*x^3 -4*y +1
+  funcaoderivada_Y<- 4*y^3 -4*x
+
+ c(4*x^3 -4*y +1,4*y^3 -4*x) 
+}
+
+```
+
+## a) Encontre numericamente pontos críticos.
+para encontrar os pontos criticos devemos achar
+y = x^3 - 1/4
+
+x = y^3
+usando chute inicial de 0,0
+
+```{r}
+#install.packages("nleqslv")
+library(nleqslv)
+chute1<- nleqslv(c(0,0), formula)$x
+chute2 <- nleqslv(c(1,1), formula)$x
+chute3 <- nleqslv(c(-1,-1), formula)$x
+```
+
+```{r,echo=FALSE}
+paste("valor x do primeiro chute (0,0) ", chute1[1], " e o valor de y é ", chute1[2])
+paste("valor x do segundo chute (1,1) ", chute2[1], " e o valor de y é ", chute2[2])
+paste("valor x do terceiro (-1,-1) chute ", chute3[1], " e o valor de y é ", chute3[2])
+```
+
+## b) Classifique usando Hessiana.
+
+derivando novamente x temos 
+fx por x temos -> $12x^2$ 
+
+fx por y temos ->4
+
+fy por y temos -> $12y^2$
+
+fy por x temos ->4
+
+```{r}
+Heiss<-function(x,y){
+  matrix(c( 12*x^2 ,-4,
+            -4,12*y^2),nrow = 2,byrow = TRUE)
+}
+
+classificar<-function(x,y){
+  hxy<-Heiss(x,y)
+  D<-det(hxy)
+  fxx<-hxy[1,1]
+  
+  if(D < 0){ 
+    return("ponto de sela")
+  } else if(D > 0 && fxx > 0){
+    return("mínimo local")
+  } else if(D > 0 && fxx < 0){
+    return("máximo local")
+  } else {
+    return("inconclusivo")
+  }
+}
+
+```
+
+Para o chute inicial 0,0
+
+```{r}
+classificar(chute1[1],chute1[2])
+
+```
+Para o chute inicial 1,1
+```{r}
+classificar(chute2[1],chute2[2])
+
+```
+Para o chute inicial -1,-1
+```{r}
+classificar(chute3[1],chute3[2])
+```
+
+## c) Discuta mínimos locais usando diferentes chutes iniciais.
+
+Utilizando diferentes chutes iniciais podemos ver que a função converge para diferentes pontos (os mais proximos deles) 
+
+
+# Questão 6 – Maximização de Função em Estatística
+
+Amostra Poisson(λ): 2,3,1,0,4,2,1,3.
+
+## a) Escreva a log-verossimilhança.
+
+## Derivação da log-verossimilhança
+
+Para $X_i \overset{\text{iid}}{\sim} \text{Poisson}(\lambda)$, a função de probabilidade é:
+
+$$P(X_i = x_i \mid \lambda) = \frac{e^{-\lambda}\,\lambda^{x_i}}{x_i!}, \quad x_i = 0, 1, 2, \ldots, \quad \lambda > 0$$
+A **função de verossimilhança** para $n$ observações independentes é:
+
+$$L(\lambda) = \prod_{i=1}^{n} \frac{e^{-\lambda}\,\lambda^{x_i}}{x_i!}
+= \frac{e^{-n\lambda}\;\lambda^{\sum_{i=1}^n x_i}}{\prod_{i=1}^n x_i!}$$
+
+Aplicando o logaritmo natural:
+
+$$\ell(\lambda) = \ln L(\lambda)
+= \sum_{i=1}^{n} \left[-\lambda + x_i \ln(\lambda) - \ln(x_i!)\right]$$
+
+$$\boxed{\ell(\lambda) = -n\lambda + \ln(\lambda)\sum_{i=1}^{n} x_i - \sum_{i=1}^{n} \ln(x_i!)}$$
+Substituindo $n = 8$ e $\sum x_i = 16$:
+
+$$\ell(\lambda) = -8\lambda + 16\ln(\lambda) - C$$
+
+onde $C = \sum_{i=1}^{n} \ln(x_i!)$ é uma **constante** em relação a $\lambda$ e não afeta a maximização.
+
+```{r}
+amostra<-c(2,3,1,0,4,2,1,3)
+
+logLikP<-function(lambda,x){
+   if(lambda <= 0) return(-Inf)
+  sum(dpois(x,lambda,log = TRUE))
+  }
+
+LoglikP_N<-function(lambda,x){
+  -logLikP(lambda,x)
+}#como vamos usar optimin devemos notar que ele minimiza a funçãoentão colocamos como negativo a log verossimilhança para maximizar ela
+
+```
+
+## b) Maximize numericamente.
+
+```{r}
+maxim <- optim(par = 1, fn = LoglikP_N,x = amostra, method = "Brent",
+             lower = 0.0001, upper = 10)
+```
+
+estimativa do lambda
+
+```{r}
+maxim$par 
+```
+log-verossimilhança do maximo
+```{r}
+-maxim$value #log-verossimilhança do maximo
+```
+
+## c) Compare com estimador analítico (aquele estudado em inferencia)
+
+O estimador analitico de um poisson é a média amostral então:
+```{r}
+lambda_chapeu_analitico<-mean(amostra)
+lambda_chapeu_analitico
+```
+Podemos ver que ambos os estimadores analiticos e a estimativa da lambda coincidem
+
+# Questão 7 – Geração de Variáveis Aleatórias
+
+A Exponencial(λ=2) tem FDA $F(x) = 1 - e^{-\lambda x}$, então a inversa é $F^{-1}(u) = -\ln(1-u)/\lambda$.
+
+## (a) Gerar 10.000 observações
+
+```{r}
+lambda <- 2
+n <- 10000
+
+u <- runif(n)
+x <- -log(1-u) / lambda
+```
+
+## (b) Histograma vs densidade teórica
+
+```{r}
+hist(x, prob = TRUE, breaks = 50, main = "Exponencial(λ=2)", xlab = "x")
+curve(dexp(x, rate = lambda), add = TRUE, col = "red", lwd = 2)
+```
+
+## (c) Média e variância amostral
+
+```{r}
+mean(x)   # teórico: 1/lambda = 0.5
+var(x)    # teórico: 1/lambda^2 = 0.25
+```
+# Questão 8 - Integração por Monte Carlo
+
+Queremos estimar $I = \int_0^1 e^{-x^2} dx$.
+
+A ideia é gerar $u \sim \text{Uniforme}(0,1)$ e calcular a média de $e^{-u^2}$.
+## a) Estimativas de Monte Carlo para n = 1000, 5000 e 10000
+
+```{r}
+monte_carlo <- function(n) {
+  u <- runif(n)
+  mean(exp(-u^2))
+}
+
+mc1000=monte_carlo(1000)
+mc5000=monte_carlo(5000)
+mc10000=monte_carlo(10000)
+```
+
+```{r,echo=FALSE}
+cat("O valor de monte carlo com n=1000 eh:", mc1000, "\n")
+cat("O valor de monte carlo com n=5000 eh:", mc5000, "\n")
+cat("O valor de monte carlo com n=10000 eh:", mc10000, "\n")
+```
+# b) Compare com integração numérica
+
+```{r}
+I_real <- integrate(function(x) exp(-x^2), 0, 1)$value
+I_real #resultado numérico
+```
+
+```{r,echo=FALSE}
+cat("o valor real da integral eh:",I_real, "\n")
+cat("O valor de monte carlo com n=1000 eh:", mc1000, "\n")
+cat("O valor de monte carlo com n=5000 eh:", mc5000, "\n")
+cat("O valor de monte carlo com n=10000 eh:", mc10000, "\n")
+```
+Todas ficaram muito próximas do valor real
+
+## (c) Intervalo de confiança (95%)
+
+```{r}
+ic_monte_carlo <- function(n) {
+  u <- runif(n)
+  vals <- exp(-u^2)
+  
+  estimativa <- mean(vals)
+  ep <- sd(vals) / sqrt(n)
+  
+  cat("n =", n, "\n")
+  cat("Estimativa:", round(estimativa, 6), "\n")
+  cat("IC 95%: [", round(estimativa - 1.96*ep, 6), ",",
+                   round(estimativa + 1.96*ep, 6), "]\n\n")
+}
+
+ic_monte_carlo(1000)
+ic_monte_carlo(5000)
+ic_monte_carlo(10000)
+```
+
+# Questão 9 - Aplicação Estatística via Monte Carlo
+
+## a) Usando simulação direta
+
+```{r}
+#gerando as amostras aleatorias
+set.seed(0503)
+n <- 20000
+amostra <- rnorm(n, 0, 1)
+p_est_mc <- mean(amostra >2)
+cat("Prob. de x>2 com uma normal(0,1) usando Monte Carlos: ", p_est_mc)
+```
+
+## b) Compare com o valor teórico
+
+```{r}
+p_teorico <- 1 - pnorm(2)
+p_teorico
+```
+
+## c) Quantas simulações são necessárias para erro menor que 0,001
+
+```{r}
+p    <- 1 - pnorm(2)
+erro <- 0.001
+z    <- qnorm(0.975)
+
+n_minimo <- ceiling(z^2 * p * (1 - p) / erro^2)
+cat("Numero minimo de simulações:", n_minimo, "\n")
+```
