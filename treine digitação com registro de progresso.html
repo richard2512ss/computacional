@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TypeFlow — Treinador de Digitação</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #141417;
+    --surface2: #1c1c21;
+    --border: #2a2a32;
+    --text: #e8e8f0;
+    --muted: #3e3e50;
+    --muted2: #6a6a80;
+    --accent: #7c6af7;
+    --accent2: #f7c76a;
+    --correct: #5af78e;
+    --wrong: #f7706a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 1.5rem 4rem;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px; left: 50%;
+    transform: translateX(-50%);
+    width: 700px; height: 700px;
+    background: radial-gradient(circle, rgba(124,106,247,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  header {
+    width: 100%; max-width: 860px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 2rem 0 1.5rem;
+  }
+  .logo { font-size: 1.5rem; font-weight: 800; letter-spacing: -1px; }
+  .logo span { color: var(--accent); }
+
+  .badges { display: flex; gap: 0.75rem; }
+  .badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.68rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 0.3rem 0.75rem;
+    border-radius: 20px;
+    color: var(--muted2);
+  }
+  .badge strong { color: var(--accent2); }
+
+  /* CARD */
+  .card {
+    width: 100%; max-width: 860px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2rem 2.5rem 1.75rem;
+    position: relative;
+    cursor: text;
+  }
+
+  /* STATS */
+  .stats-row {
+    display: flex; gap: 0.75rem; margin-bottom: 1.75rem; flex-wrap: wrap;
+  }
+  .stat-box {
+    flex: 1; min-width: 90px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    text-align: center;
+  }
+  .stat-label {
+    font-size: 0.6rem; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase;
+    color: var(--muted2); margin-bottom: 0.3rem;
+  }
+  .stat-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.75rem; font-weight: 700;
+    color: var(--text); line-height: 1;
+  }
+  .c-accent { color: var(--accent) !important; }
+  .c-gold   { color: var(--accent2) !important; }
+
+  /* PROGRESS */
+  .progress-bar {
+    width: 100%; height: 3px;
+    background: var(--surface2);
+    border-radius: 99px; overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+  .progress-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 99px;
+    transition: width 0.08s linear;
+    box-shadow: 0 0 10px rgba(124,106,247,0.4);
+  }
+
+  /* TYPING DISPLAY */
+  .words-outer {
+    position: relative;
+    height: 5.4rem;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+  .words-inner {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.2rem;
+    line-height: 2.7rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    transition: transform 0.13s ease;
+    user-select: none;
+    position: relative;
+  }
+
+  /* char spans — display:inline to avoid spacing bugs */
+  .ch         { color: var(--muted); display: inline; }
+  .ch.correct { color: var(--correct); }
+  .ch.wrong   { color: var(--wrong); }
+  .ch.wsp     { background: rgba(247,112,106,0.3); border-radius: 2px; }
+
+  /* Cursor beam — absolutely positioned */
+  #cursor-beam {
+    position: absolute;
+    width: 2px;
+    height: 1.4rem;
+    background: var(--accent);
+    border-radius: 1px;
+    pointer-events: none;
+    box-shadow: 0 0 8px rgba(124,106,247,0.7);
+    animation: blink 1.1s step-end infinite;
+    z-index: 5;
+  }
+  #cursor-beam.off { display: none; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* HINT */
+  .hint {
+    text-align: center; font-size: 0.75rem;
+    color: var(--muted2); letter-spacing: 0.4px;
+    margin-bottom: 1rem; transition: opacity 0.3s;
+  }
+  .hint.gone { opacity: 0; pointer-events: none; }
+  .kbd {
+    display: inline-block;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: 'Space Mono', monospace; font-size: 0.65rem;
+    padding: 0.1rem 0.4rem; color: var(--muted2);
+  }
+
+  /* CONTROLS */
+  .controls {
+    display: flex; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;
+  }
+  .mode-tabs {
+    display: flex; gap: 0.3rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 0.25rem;
+  }
+  .tab {
+    background: none; border: none; color: var(--muted2);
+    font-family: 'Space Mono', monospace; font-size: 0.72rem;
+    padding: 0.35rem 0.8rem; border-radius: 7px;
+    cursor: pointer; transition: all 0.12s;
+  }
+  .tab.active { background: var(--accent); color: #fff; font-weight: 700; }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .btn-restart {
+    display: flex; align-items: center; gap: 0.45rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 0.82rem; font-weight: 700;
+    padding: 0.5rem 1.1rem; cursor: pointer; transition: all 0.12s;
+  }
+  .btn-restart:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-restart svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+  /* RESULT OVERLAY */
+  .overlay {
+    display: none; position: absolute; inset: 0;
+    background: rgba(13,13,15,0.93);
+    backdrop-filter: blur(10px);
+    border-radius: 20px; z-index: 20;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 1.25rem;
+  }
+  .overlay.show { display: flex; animation: fadein 0.25s ease; }
+  @keyframes fadein { from{opacity:0}to{opacity:1} }
+
+  .ov-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--muted2); }
+  .ov-wpm { font-family:'Space Mono',monospace; font-size:5rem; font-weight:700; color:var(--accent); line-height:1; text-shadow:0 0 50px rgba(124,106,247,0.4); }
+  .ov-wpm small { font-size:1.5rem; color:var(--muted2); }
+  .ov-row { display:flex; gap:2.5rem; }
+  .ov-stat { text-align:center; }
+  .ov-stat-lbl { font-size:0.6rem; letter-spacing:2px; text-transform:uppercase; color:var(--muted2); margin-bottom:0.2rem; }
+  .ov-stat-val { font-family:'Space Mono',monospace; font-size:1.05rem; color:var(--text); }
+  .btn-again { background:var(--accent); border:none; border-radius:12px; color:#fff; font-family:'Syne',sans-serif; font-weight:700; font-size:0.9rem; padding:0.7rem 2rem; cursor:pointer; transition:opacity .12s,transform .1s; }
+  .btn-again:hover { opacity:.85; transform:scale(.98); }
+
+  /* HISTORY */
+  .section { width:100%; max-width:860px; margin-top:1.5rem; }
+  .section-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.65rem; padding:0 0.15rem; }
+  .section-title { font-size:0.65rem; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--muted2); }
+  .btn-clear { background:none; border:none; color:var(--muted2); font-size:0.68rem; font-family:'Space Mono',monospace; cursor:pointer; padding:0.15rem 0.4rem; border-radius:5px; transition:color .12s; }
+  .btn-clear:hover { color:var(--wrong); }
+
+  .section-hd-right { display:flex; align-items:center; gap:0.5rem; }
+  .btn-download {
+    display: flex; align-items: center; gap: 0.35rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 7px; color: var(--muted2);
+    font-family: 'Space Mono', monospace; font-size: 0.68rem;
+    padding: 0.28rem 0.65rem; cursor: pointer; transition: all .12s;
+  }
+  .btn-download:hover { border-color: var(--accent2); color: var(--accent2); }
+  .btn-download svg { width: 11px; height: 11px; flex-shrink: 0; }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 0.6rem 1.2rem;
+    font-family: 'Space Mono', monospace; font-size: 0.72rem; color: var(--correct);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 100; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .hist-list { display:flex; gap:0.5rem; flex-wrap:wrap; align-items:flex-end; }
+  .h-item { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:0.55rem 0.85rem; min-width:65px; text-align:center; transition:border-color .12s; }
+  .h-item:hover { border-color:var(--accent); }
+  .h-item.best { border-color:var(--accent2); background:rgba(247,199,106,0.04); }
+  .h-wpm { font-family:'Space Mono',monospace; font-size:1.05rem; font-weight:700; color:var(--accent); display:block; }
+  .h-item.best .h-wpm { color:var(--accent2); }
+  .h-meta { font-size:0.58rem; color:var(--muted2); display:block; margin-top:0.15rem; line-height:1.4; }
+  .empty { font-family:'Space Mono',monospace; font-size:0.72rem; color:var(--muted2); }
+
+  /* CHART */
+  .chart-card { width:100%; max-width:860px; margin-top:0.75rem; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:1.25rem 1.5rem; display:none; }
+  .chart-card.show { display:block; }
+  canvas { display:block; width:100%!important; height:110px!important; }
+
+  #inp { position:fixed; left:-9999px; top:-9999px; opacity:0; width:1px; height:1px; }
+
+  @media(max-width:600px){
+    .card{padding:1.25rem 1rem 1.25rem;}
+    .words-inner{font-size:1rem;line-height:2.4rem;}
+    .words-outer{height:4.8rem;}
+    .stat-value{font-size:1.35rem;}
+    .ov-wpm{font-size:3.5rem;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Type<span>Flow</span></div>
+  <div class="badges">
+    <div class="badge">Melhor: <strong id="b-best">—</strong> WPM</div>
+    <div class="badge">Sessões: <strong id="b-sessions">0</strong></div>
+  </div>
+</header>
+
+<div class="card" id="card" onclick="focus_inp()">
+  <div class="stats-row">
+    <div class="stat-box"><div class="stat-label">WPM</div><div class="stat-value c-accent" id="s-wpm">0</div></div>
+    <div class="stat-box"><div class="stat-label">Precisão</div><div class="stat-value" id="s-acc">—</div></div>
+    <div class="stat-box"><div class="stat-label">Tempo</div><div class="stat-value c-gold" id="s-time">—</div></div>
+    <div class="stat-box"><div class="stat-label">Erros</div><div class="stat-value" id="s-err">0</div></div>
+  </div>
+
+  <div class="progress-bar"><div class="progress-fill" id="prog"></div></div>
+
+  <div class="words-outer" id="words-outer">
+    <div class="words-inner" id="words-inner">
+      <span id="cursor-beam" class="off"></span>
+    </div>
+  </div>
+
+  <p class="hint" id="hint">Clique aqui ou pressione qualquer tecla para começar &nbsp;·&nbsp; <span class="kbd">Tab</span> reinicia</p>
+
+  <div class="controls">
+    <div class="mode-tabs">
+      <button class="tab active" onclick="set_mode('curto',this)">Curto</button>
+      <button class="tab" onclick="set_mode('medio',this)">Médio</button>
+      <button class="tab" onclick="set_mode('longo',this)">Longo</button>
+    </div>
+    <button class="btn-restart" onclick="restart()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.33"/>
+      </svg>
+      Reiniciar
+    </button>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="ov-label">resultado</div>
+    <div class="ov-wpm" id="ov-wpm">0 <small>WPM</small></div>
+    <div class="ov-row">
+      <div class="ov-stat"><div class="ov-stat-lbl">Precisão</div><div class="ov-stat-val" id="ov-acc">—</div></div>
+      <div class="ov-stat"><div class="ov-stat-lbl">Tempo</div><div class="ov-stat-val" id="ov-time">—</div></div>
+      <div class="ov-stat"><div class="ov-stat-lbl">Erros</div><div class="ov-stat-val" id="ov-err">0</div></div>
+    </div>
+    <button class="btn-again" onclick="restart()">↩ Tentar novamente</button>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-hd">
+    <span class="section-title">Histórico</span>
+    <div class="section-hd-right">
+      <button class="btn-download" onclick="download_history()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Baixar CSV
+      </button>
+      <button class="btn-clear" onclick="clear_history()">Limpar</button>
+    </div>
+  </div>
+  <div class="hist-list" id="hist-list">
+    <span class="empty">Nenhuma sessão ainda — complete um treino!</span>
+  </div>
+</div>
+
+<div class="chart-card" id="chart-card">
+  <div class="section-title" style="margin-bottom:.85rem">Progresso de WPM</div>
+  <canvas id="chart"></canvas>
+</div>
+
+<div id="toast">✓ Histórico baixado!</div>
+
+<input id="inp" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+
+<script>
+// ── TEXTOS ──────────────────────────────────────────────────────────────────
+const TEXTS = {
+  curto: [
+    "O sol nasceu cedo e iluminou os campos verdes ao redor da cidade.",
+    "Maria guardou o livro na mochila e saiu correndo para a escola.",
+    "O vento frio da manhã fazia as folhas dançar pelas calçadas.",
+    "Pedro acordou cedo, tomou café e foi ao mercado comprar pão.",
+    "As crianças brincavam no parque enquanto os pais conversavam.",
+    "O cachorro late toda vez que alguém bate no portão de casa.",
+    "A professora escreveu o dever no quadro e pediu silêncio na sala.",
+    "Ela olhou pela janela e viu que estava começando a chover forte.",
+    "João abriu o computador e começou a estudar para a prova de amanhã.",
+    "O trem chegou atrasado e todos ficaram esperando na plataforma fria.",
+    "A chuva batia forte nas janelas enquanto eles liam à beira do fogo.",
+    "Ela sorriu quando viu o cachorrinho dormindo tranquilo no sofá.",
+    "Compramos frutas frescas na feira e fizemos um suco delicioso em casa.",
+    "O gato subiu no telhado e ficou observando os pássaros voar.",
+    "Minha avó faz o melhor bolo de chocolate que já provei na vida.",
+    "A cidade acordou com o cheiro de café passado e pão quentinho.",
+    "Ele pegou o guarda-chuva e saiu antes que a chuva piorasse.",
+    "Esse texto é o mais fácil de todos"
+  ],
+  medio: [
+    "A tecnologia mudou a forma como as pessoas se comunicam no mundo moderno. Em segundos, é possível trocar mensagens com alguém que está do outro lado do planeta.",
+    "O Brasil é um país de dimensões continentais, com uma diversidade cultural enorme. Das florestas da Amazônia às praias do Nordeste, cada região tem sua própria identidade.",
+    "Ler livros é um dos hábitos mais enriquecedores que uma pessoa pode cultivar. Além de ampliar o vocabulário, a leitura desenvolve o pensamento crítico e a empatia.",
+    "O trânsito nas grandes cidades é um problema que afeta milhões de pessoas todos os dias. Investir em transporte público de qualidade é essencial para resolver essa questão.",
+    "A alimentação saudável é fundamental para manter o corpo e a mente em equilíbrio. Consumir frutas, legumes e grãos integrais ajuda a prevenir diversas doenças.",
+    "Estudar um novo idioma abre portas no mercado de trabalho e permite conhecer culturas diferentes. Com dedicação diária, qualquer pessoa pode aprender a se comunicar em outra língua.",
+    "As estrelas que vemos no céu noturno estão a anos-luz de distância da Terra. Algumas delas podem nem existir mais, pois a luz que observamos partiu há milhões de anos.",
+    "O café é a segunda bebida mais consumida no mundo, superado apenas pela água. O Brasil é o maior produtor mundial do grão, responsável por cerca de um terço da produção global.",
+    "Aprender a tocar um instrumento musical exige paciência e prática constante. No entanto, os benefícios vão além da música, melhorando a concentração e a coordenação motora.",
+    "A fotografia é uma forma de arte que captura momentos únicos e eterniza memórias. Com a chegada dos smartphones, qualquer pessoa pode registrar o mundo ao seu redor.",
+    "Dormir bem é tão importante quanto comer bem e se exercitar. Um sono de qualidade melhora o humor, a memória e a capacidade de tomar boas decisões ao longo do dia.",
+    "A leitura de jornais e revistas ajuda a manter o cidadão informado sobre os acontecimentos do mundo. Checar fontes confiáveis é essencial para não cair em desinformação.",
+  ],
+  longo: [
+    "A inteligência artificial está transformando todos os setores da economia de maneiras que nunca imaginamos. Máquinas aprendem a reconhecer padrões, traduzir idiomas e até criar obras de arte. No entanto, junto com as oportunidades surgem desafios éticos importantes, como a privacidade dos dados e o impacto no mercado de trabalho. Cabe à sociedade debater esses temas com cuidado.",
+    "O oceano cobre cerca de setenta por cento da superfície terrestre e ainda guarda inúmeros segredos. As profundezas marinhas são um dos ambientes menos explorados do planeta, abrigando criaturas desconhecidas pela ciência. A preservação dos oceanos é vital não apenas para a biodiversidade marinha, mas também para a regulação do clima global. Reduzir a poluição e a pesca predatória são medidas urgentes.",
+    "Viajar é uma das experiências mais transformadoras que existem. Quando saímos da nossa rotina e nos expomos a culturas diferentes, voltamos com uma visão de mundo mais ampla e generosa. Não é necessário ir longe para se maravilhar: às vezes, basta explorar a própria cidade com novos olhos. Cada esquina pode esconder uma história, um sabor diferente ou um encontro inesperado.",
+    "A história da humanidade é marcada por descobertas que mudaram o curso da civilização. A invenção da escrita permitiu que o conhecimento fosse transmitido entre gerações sem depender da memória oral. A prensa de Gutenberg democratizou o acesso ao saber. A eletricidade transformou a noite em dia. E a internet conectou bilhões de pessoas em uma rede global de informação e troca.",
+    "O sono é tão importante quanto a alimentação e os exercícios físicos para a saúde. Durante o repouso, o cérebro consolida memórias, o corpo se repara e o sistema imunológico se fortalece. Dormir menos do que o necessário afeta a concentração, o humor e até o metabolismo. Especialistas recomendam entre sete e nove horas de sono por noite para adultos saudáveis.",
+    "A música tem o poder de despertar emoções profundas e conectar pessoas de culturas completamente diferentes. Um simples acorde pode trazer de volta uma memória esquecida ou acalmar uma mente agitada. Ao longo da história, a música sempre esteve presente nos momentos mais importantes da vida humana, do nascimento à morte, do amor à guerra. Ela é, sem dúvida, uma linguagem universal.",
+  ]
+};
+
+// ── ESTADO ──────────────────────────────────────────────────────────────────
+let mode = 'curto';
+let text = '';
+let chars = [];
+let pos = 0;
+let errors = 0;
+let started = false;
+let finished = false;
+let startTime = null;
+let ticker = null;
+
+// ── INIT ────────────────────────────────────────────────────────────────────
+function pick() {
+  const pool = TEXTS[mode];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function init() {
+  text = pick();
+  chars = [];
+  pos = 0;
+  errors = 0;
+  started = false;
+  finished = false;
+  startTime = null;
+  clearInterval(ticker);
+
+  document.getElementById('s-wpm').textContent = '0';
+  document.getElementById('s-acc').textContent = '—';
+  document.getElementById('s-time').textContent = '—';
+  document.getElementById('s-err').textContent = '0';
+  document.getElementById('prog').style.width = '0%';
+  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('hint').classList.remove('gone');
+  document.getElementById('inp').value = '';
+
+  build();
+  reposition_cursor();
+}
+
+function build() {
+  const inner = document.getElementById('words-inner');
+  // Rebuild inner — keep cursor-beam span
+  inner.innerHTML = '';
+  const beam = document.createElement('span');
+  beam.id = 'cursor-beam';
+  inner.appendChild(beam);
+
+  for (const ch of text) {
+    const s = document.createElement('span');
+    s.className = 'ch';
+    s.textContent = ch;
+    s._err = false;
+    inner.appendChild(s);
+    chars.push(s);
+  }
+}
+
+// ── CURSOR ──────────────────────────────────────────────────────────────────
+function reposition_cursor() {
+  const beam = document.getElementById('cursor-beam');
+  const inner = document.getElementById('words-inner');
+
+  if (pos >= chars.length) {
+    beam.classList.add('off');
+    return;
+  }
+  beam.classList.remove('off');
+
+  const ch = chars[pos];
+  const cr = ch.getBoundingClientRect();
+  const ir = inner.getBoundingClientRect();
+
+  beam.style.left = (cr.left - ir.left) + 'px';
+  beam.style.top  = (cr.top - ir.top + (cr.height - beam.offsetHeight) / 2 + 1) + 'px';
+}
+
+function scroll_to_cursor() {
+  const inner  = document.getElementById('words-inner');
+  const outer  = document.getElementById('words-outer');
+  if (pos >= chars.length) return;
+
+  const ch = chars[pos];
+  const cr = ch.getBoundingClientRect();
+  const or = outer.getBoundingClientRect();
+  const lineH = parseFloat(getComputedStyle(inner).lineHeight) || 42;
+  const relTop = cr.top - or.top;
+
+  // If cursor passed line 1 (second visible line), scroll down one line
+  if (relTop > lineH * 1.55) {
+    const cur = getTranslateY(inner);
+    inner.style.transform = `translateY(${cur - lineH}px)`;
+    requestAnimationFrame(reposition_cursor);
+  } else if (relTop < -4) {
+    const cur = getTranslateY(inner);
+    inner.style.transform = `translateY(${cur + lineH}px)`;
+    requestAnimationFrame(reposition_cursor);
+  } else {
+    reposition_cursor();
+  }
+}
+
+function getTranslateY(el) {
+  const t = el.style.transform;
+  if (!t) return 0;
+  const m = t.match(/translateY\(([^)]+)px\)/);
+  return m ? parseFloat(m[1]) : 0;
+}
+
+// ── INPUT ────────────────────────────────────────────────────────────────────
+const inp = document.getElementById('inp');
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Tab') { e.preventDefault(); restart(); return; }
+  if (!finished) focus_inp();
+});
+
+inp.addEventListener('keydown', e => {
+  if (finished) return;
+  if (e.key === 'Tab') { e.preventDefault(); restart(); return; }
+  if (e.key === 'Backspace') {
+    e.preventDefault();
+    if (pos > 0) {
+      pos--;
+      if (chars[pos]._err) { errors = Math.max(0, errors - 1); }
+      chars[pos].className = 'ch';
+      chars[pos]._err = false;
+      scroll_to_cursor();
+      update_prog();
+      update_stats_display();
+    }
+  }
+});
+
+inp.addEventListener('input', () => {
+  if (finished) return;
+  const val = inp.value;
+  inp.value = '';
+  if (!val) return;
+
+  if (!started) {
+    started = true;
+    startTime = Date.now();
+    document.getElementById('hint').classList.add('gone');
+    ticker = setInterval(update_stats_display, 250);
+  }
+
+  for (const ch of val) {
+    if (pos >= chars.length) break;
+    const expected = chars[pos].textContent;
+    if (ch === expected) {
+      chars[pos].className = 'ch correct';
+      chars[pos]._err = false;
+    } else {
+      chars[pos].className = expected === ' ' ? 'ch wsp' : 'ch wrong';
+      chars[pos]._err = true;
+      errors++;
+    }
+    pos++;
+  }
+
+  scroll_to_cursor();
+  update_prog();
+
+  if (pos >= chars.length) finish();
+});
+
+function focus_inp() { inp.focus({ preventScroll: true }); }
+function update_prog() {
+  document.getElementById('prog').style.width = (pos / chars.length * 100) + '%';
+}
+
+// ── LIVE STATS ───────────────────────────────────────────────────────────────
+function update_stats_display() {
+  if (!started || finished) return;
+  const elapsed = (Date.now() - startTime) / 1000;
+  const correct = chars.slice(0, pos).filter(c => c.classList.contains('correct')).length;
+  const wpm = Math.round((correct / 5) / (elapsed / 60));
+  document.getElementById('s-wpm').textContent = wpm;
+  document.getElementById('s-time').textContent = fmt(elapsed);
+  document.getElementById('s-err').textContent = errors;
+  const acc = pos > 0 ? Math.round(((pos - errors) / pos) * 100) : 100;
+  document.getElementById('s-acc').textContent = acc + '%';
+}
+
+// ── FINISH ───────────────────────────────────────────────────────────────────
+function finish() {
+  finished = true;
+  clearInterval(ticker);
+  const elapsed = (Date.now() - startTime) / 1000;
+  const correct = chars.filter(c => c.classList.contains('correct')).length;
+  const wpm = Math.round((correct / 5) / (elapsed / 60));
+  const acc = Math.round((correct / chars.length) * 100);
+
+  document.getElementById('ov-wpm').innerHTML = `${wpm} <small>WPM</small>`;
+  document.getElementById('ov-acc').textContent = acc + '%';
+  document.getElementById('ov-time').textContent = fmt(elapsed);
+  document.getElementById('ov-err').textContent = errors;
+  document.getElementById('overlay').classList.add('show');
+
+  save_entry({ wpm, acc, errors, mode, date: new Date().toISOString() });
+  render_history();
+}
+
+function fmt(s) {
+  return s < 60 ? Math.round(s) + 's' : Math.floor(s/60) + 'm' + Math.round(s%60) + 's';
+}
+
+// ── CONTROLS ──────────────────────────────────────────────────────────────────
+function restart() {
+  document.getElementById('words-inner').style.transform = 'translateY(0)';
+  init();
+  setTimeout(focus_inp, 60);
+}
+
+function set_mode(m, btn) {
+  mode = m;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  restart();
+}
+
+// ── HISTORY ──────────────────────────────────────────────────────────────────
+const HKEY = 'typeflow_v2';
+function load_history()   { try { return JSON.parse(localStorage.getItem(HKEY)) || []; } catch { return []; } }
+function save_entry(e)    { const h = load_history(); h.push(e); localStorage.setItem(HKEY, JSON.stringify(h)); update_badges(h); }
+function update_badges(h) {
+  const best = h.length ? Math.max(...h.map(e => e.wpm)) : null;
+  document.getElementById('b-best').textContent = best ?? '—';
+  document.getElementById('b-sessions').textContent = h.length;
+}
+function clear_history() {
+  if (!confirm('Limpar todo o histórico?')) return;
+  localStorage.removeItem(HKEY);
+  render_history(); update_badges([]);
+}
+
+function render_history() {
+  const h = load_history();
+  const list = document.getElementById('hist-list');
+  const cc   = document.getElementById('chart-card');
+
+  if (!h.length) {
+    list.innerHTML = '<span class="empty">Nenhuma sessão ainda — complete um treino!</span>';
+    cc.classList.remove('show'); return;
+  }
+
+  const best = Math.max(...h.map(e => e.wpm));
+  list.innerHTML = '';
+  h.slice(-24).reverse().forEach(e => {
+    const d = new Date(e.date);
+    const t = d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+    const el = document.createElement('div');
+    el.className = 'h-item' + (e.wpm === best ? ' best' : '');
+    el.innerHTML = `<span class="h-wpm">${e.wpm}</span><span class="h-meta">${e.acc}% · ${e.mode}<br>${t}</span>`;
+    list.appendChild(el);
+  });
+
+  cc.classList.add('show');
+  draw_chart(h);
+}
+
+// ── CHART ─────────────────────────────────────────────────────────────────────
+function draw_chart(h) {
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth - 32;
+  const H = 110;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.scale(dpr, dpr);
+
+  const data = h.slice(-30).map(e => e.wpm);
+  const n = data.length;
+  if (n < 2) { ctx.clearRect(0,0,W,H); return; }
+
+  const maxV = Math.max(...data), minV = Math.min(...data);
+  const range = maxV - minV || 1;
+  const p = { t:14, b:18, l:8, r:8 };
+  const pw = W - p.l - p.r, ph = H - p.t - p.b;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(42,42,50,0.8)'; ctx.lineWidth = 1;
+  [0, 0.5, 1].forEach(t => {
+    const y = p.t + ph * (1 - t);
+    ctx.beginPath(); ctx.moveTo(p.l, y); ctx.lineTo(W - p.r, y); ctx.stroke();
+  });
+
+  const pts = data.map((v, i) => ({
+    x: p.l + (i / (n - 1)) * pw,
+    y: p.t + ph * (1 - (v - minV) / range)
+  }));
+
+  // Fill
+  const grad = ctx.createLinearGradient(0, p.t, 0, p.t + ph);
+  grad.addColorStop(0, 'rgba(124,106,247,0.28)');
+  grad.addColorStop(1, 'rgba(124,106,247,0)');
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, p.t + ph);
+  pts.forEach(pt => ctx.lineTo(pt.x, pt.y));
+  ctx.lineTo(pts[n-1].x, p.t + ph);
+  ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  pts.forEach((pt, i) => i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
+  ctx.strokeStyle = '#7c6af7'; ctx.lineWidth = 2;
+  ctx.lineJoin = 'round'; ctx.stroke();
+
+  // Dots + labels
+  ctx.font = '10px Space Mono, monospace'; ctx.textAlign = 'center';
+  pts.forEach((pt, i) => {
+    const last = i === n - 1;
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, last ? 4 : 3, 0, Math.PI * 2);
+    ctx.fillStyle = last ? '#f7c76a' : '#7c6af7'; ctx.fill();
+    if (last || i === 0 || i % Math.max(1, Math.ceil(n / 7)) === 0) {
+      ctx.fillStyle = last ? '#f7c76a' : 'rgba(124,106,247,0.8)';
+      ctx.fillText(data[i], pt.x, pt.y - 7);
+    }
+  });
+}
+
+// ── DOWNLOAD CSV ──────────────────────────────────────────────────────────────
+function download_history() {
+  const h = load_history();
+  if (!h.length) { show_toast('Nenhum dado para exportar'); return; }
+
+  const header = ['#', 'Data', 'Hora', 'WPM', 'Precisão (%)', 'Tempo', 'Erros', 'Modo'];
+  const rows = h.map((e, i) => {
+    const d = new Date(e.date);
+    const date = d.toLocaleDateString('pt-BR');
+    const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return [i + 1, date, time, e.wpm, e.acc, fmt_raw(e.time ?? ''), e.errors ?? 0, e.mode ?? '—'];
+  });
+
+  const csv = [header, ...rows]
+    .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `typeflow_historico_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  show_toast('✓ Histórico baixado!');
+}
+
+function fmt_raw(s) {
+  if (!s && s !== 0) return '—';
+  return s < 60 ? Math.round(s) + 's' : Math.floor(s/60) + 'm' + Math.round(s%60) + 's';
+}
+
+function show_toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+update_badges(load_history());
+render_history();
+init();
+setTimeout(focus_inp, 80);
+</script>
+</body>
+</html>
